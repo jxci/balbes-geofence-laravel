@@ -6,7 +6,10 @@
   "autoload": {
     "psr-4": {
       "Jxci\\\\Geofence\\\\": "src/Geofence/"
-    }
+    },
+    "classmap": [
+      "src/Geofence/"
+    ]
   },
   "require": {
     "php": ">=8.1",
