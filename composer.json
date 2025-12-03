@@ -1,0 +1,27 @@
+{
+  "name": "jxci/balbes-geofence-laravel",
+  "description": "Geofence (DaData + YandexGeo) SDK for Laravel",
+  "type": "library",
+  "license": "proprietary",
+  "autoload": {
+    "psr-4": {
+      "Jxci\\\\Geofence\\\\": "src/Geofence/"
+    }
+  },
+  "require": {
+    "php": ">=8.1",
+    "guzzlehttp/guzzle": "^7.0"
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Jxci\\\\Geofence\\\\GeofenceServiceProvider"
+      ],
+      "aliases": {
+        "Geofence": "Jxci\\\\Geofence\\\\Geofence"
+      }
+    }
+  }
+}
+
+
