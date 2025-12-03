@@ -17,9 +17,7 @@
   },
   "extra": {
     "laravel": {
-      "providers": [
-        "Jxci\\\\Geofence\\\\GeofenceServiceProvider"
-      ],
+      "providers": [],
       "aliases": {
         "Geofence": "Jxci\\\\Geofence\\\\Geofence"
       }
