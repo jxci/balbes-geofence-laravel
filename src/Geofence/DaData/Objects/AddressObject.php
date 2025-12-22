@@ -172,4 +172,49 @@ class AddressObject
             'has_coordinates' => $this->hasCoordinates(),
         ];
     }
+
+    /**
+     * Преобразовать объект в массив в едином формате
+     * 
+     * @return array Массив с данными адреса в унифицированном формате
+     */
+    public function toArray(): array
+    {
+        $data = $this->data;
+        $result = [];
+        $addressData = $data['data'] ?? [];
+
+        # Нормализуем координаты (поддержка geo_lat/geo_lon и latitude/longitude)
+        if (isset($addressData['geo_lat']) && isset($addressData['geo_lon'])) {
+            $result['latitude'] = (float)$addressData['geo_lat'];
+            $result['longitude'] = (float)$addressData['geo_lon'];
+            $result['geo_lat'] = $result['latitude'];
+            $result['geo_lon'] = $result['longitude'];
+        }
+
+        # Добавляем value (полный адрес из data['value'])
+        $result['value'] = $data['value'] ?? '';
+
+        # Добавляем стандартные поля адреса из data['data']
+        $fields = ['city', 'street', 'house', 'country', 'region', 'district', 'building', 'apartment', 'postal_code', 'flat'];
+        foreach ($fields as $field) {
+            if (isset($addressData[$field])) {
+                $result[$field] = $addressData[$field];
+            }
+        }
+
+        # Добавляем метаданные (accuracy, level и т.д.)
+        if (isset($addressData['accuracy'])) {
+            $result['accuracy'] = $addressData['accuracy'];
+        }
+        if (isset($addressData['level'])) {
+            $result['level'] = $addressData['level'];
+        }
+
+        # Добавляем все остальные поля из исходных данных
+        # Нормализованные поля перезапишут исходные при совпадении ключей
+        $result = array_merge($data, $result);
+
+        return $result;
+    }
 }
