@@ -177,4 +177,42 @@ class GeoObject
             'has_coordinates' => $this->hasCoordinates(),
         ];
     }
+
+    /**
+     * Преобразовать объект в массив в едином формате
+     * 
+     * @return array Массив с данными адреса в унифицированном формате
+     */
+    public function toArray(): array
+    {
+        $result = [];
+
+        # Нормализуем координаты
+        $latitude = $this->getLatitude();
+        $longitude = $this->getLongitude();
+        if ($latitude !== null && $longitude !== null) {
+            $result['latitude'] = $latitude;
+            $result['longitude'] = $longitude;
+            $result['geo_lat'] = $latitude;
+            $result['geo_lon'] = $longitude;
+        }
+
+        # Добавляем value (полный адрес)
+        $result['value'] = $this->getAddress() ?? '';
+
+        # Добавляем стандартные поля адреса
+        $result['city'] = $this->getCity();
+        $result['street'] = $this->getStreet();
+        $result['house'] = $this->getHouse();
+        $result['country'] = $this->getCountry();
+        $result['region'] = $this->getRegion();
+        $result['accuracy'] = $this->getAccuracy();
+        $result['kind'] = $this->getKind();
+
+        # Добавляем все остальные поля из исходных данных
+        # Нормализованные поля перезапишут исходные при совпадении ключей
+        $result = array_merge($this->data, $result);
+
+        return $result;
+    }
 }

@@ -99,4 +99,39 @@ class GeoObject
             'has_coordinates' => $this->hasCoordinates(),
         ];
     }
+
+    /**
+     * Преобразовать объект в массив в едином формате
+     * 
+     * @return array Массив с данными адреса в унифицированном формате
+     */
+    public function toArray(): array
+    {
+        $data = $this->data;
+        $result = [];
+
+        # Нормализуем координаты
+        if (isset($data['geo_lat']) && isset($data['geo_lon'])) {
+            $result['latitude'] = (float)$data['geo_lat'];
+            $result['longitude'] = (float)$data['geo_lon'];
+            $result['geo_lat'] = $result['latitude'];
+            $result['geo_lon'] = $result['longitude'];
+        }
+
+        # Добавляем value (полный адрес)
+        $result['value'] = $data['value'] ?? $data['address'] ?? '';
+
+        # Добавляем стандартные поля адреса
+        $fields = ['city', 'street', 'house', 'country', 'region', 'district', 'building', 'apartment'];
+        foreach ($fields as $field) {
+            if (isset($data[$field])) {
+                $result[$field] = $data[$field];
+            }
+        }
+
+        # Добавляем все остальные поля из исходных данных
+        $result = array_merge($data, $result);
+
+        return $result;
+    }
 }

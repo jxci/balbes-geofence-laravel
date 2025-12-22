@@ -128,4 +128,18 @@ class YandexGeoGeocodeResult extends SuccessResult
             'has_results' => $this->hasResults(),
         ];
     }
+
+    /**
+     * Получить все результаты в виде массива массивов
+     * 
+     * @return array<int, array> Массив результатов, где каждый элемент - массив с данными адреса
+     */
+    public function toArray(): array
+    {
+        $results = [];
+        foreach ($this->getResults() as $geoObject) {
+            $results[] = $geoObject->toArray();
+        }
+        return $results;
+    }
 }

@@ -18,11 +18,20 @@ abstract class SuccessResult extends BaseResult
     abstract public function getResults(): array;
 
     /**
-     * Получить первый результат
+     * Получить все результаты в виде массива массивов
+     * 
+     * @return array<int, array> Массив результатов, где каждый элемент - массив с данными адреса
+     */
+    abstract public function toArray(): array;
+
+    /**
+     * Получить первый результат в виде массива
+     * 
+     * @return array|null Массив с данными первого результата или null
      */
     public function getFirstResult(): ?array
     {
-        $results = $this->getResults();
+        $results = $this->toArray();
         return $results[0] ?? null;
     }
 
@@ -31,7 +40,7 @@ abstract class SuccessResult extends BaseResult
      */
     public function getLastResult(): ?array
     {
-        $results = $this->getResults();
+        $results = $this->toArray();
         return end($results) ?: null;
     }
 
@@ -40,7 +49,7 @@ abstract class SuccessResult extends BaseResult
      */
     public function getResult(int $index): ?array
     {
-        $results = $this->getResults();
+        $results = $this->toArray();
         return $results[$index] ?? null;
     }
 
@@ -49,7 +58,7 @@ abstract class SuccessResult extends BaseResult
      */
     public function filterResults(callable $callback): array
     {
-        return array_filter($this->getResults(), $callback);
+        return array_filter($this->toArray(), $callback);
     }
 
     /**
@@ -57,11 +66,23 @@ abstract class SuccessResult extends BaseResult
      */
     public function findResult(callable $callback): ?array
     {
-        foreach ($this->getResults() as $result) {
+        foreach ($this->toArray() as $result) {
             if ($callback($result)) {
                 return $result;
             }
         }
         return null;
+    }
+
+    /**
+     * Получить нормализованные данные результата
+     * 
+     * Унифицирует формат данных между разными провайдерами
+     * 
+     * @return array<int, array> Массив результатов в едином формате
+     */
+    public function getNormalizedData(): array
+    {
+        return $this->toArray();
     }
 }
