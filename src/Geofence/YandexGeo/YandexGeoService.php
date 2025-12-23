@@ -2,7 +2,7 @@
 
 namespace App\Support\Geofence\YandexGeo;
 
-use App\Support\Geofence\AbstractGeoServiceV2;
+use App\Support\Geofence\AbstractGeoService;
 use App\Support\Geofence\Enums\GeofenceErrorType;
 use App\Support\Geofence\Exceptions\YandexGeo\YandexGeoApiException;
 use App\Support\Geofence\Exceptions\YandexGeo\YandexGeoNetworkException;
@@ -16,7 +16,7 @@ use GuzzleHttp\Exception\GuzzleException;
 /**
  * Yandex Geo API сервис
  */
-class YandexGeoService extends AbstractGeoServiceV2
+class YandexGeoService extends AbstractGeoService
 {
     private readonly string $apiUrl;
     private readonly string $apiKey;

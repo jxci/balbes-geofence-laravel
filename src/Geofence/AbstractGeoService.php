@@ -2,38 +2,41 @@
 
 namespace App\Support\Geofence;
 
-use Illuminate\Support\Facades\Log;
-use Psr\Log\LoggerInterface;
+use App\Support\Geofence\Contracts\CorrelationContextInterface;
+use App\Support\Geofence\Contracts\LoggerContextInterface;
+use App\Support\Geofence\Results\BaseResult;
+use App\Support\Geofence\Traits\CorrelationContextTrait;
+use App\Support\Geofence\Traits\LoggerContextTrait;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Exception\RequestException;
+use Illuminate\Support\Facades\Config;
 
 /**
- * Абстрактный класс для геосервисов
+ * Абстрактный базовый класс для геосервисов с поддержкой Result объектов
  */
-abstract class AbstractGeoService
+abstract class AbstractGeoService implements CorrelationContextInterface, LoggerContextInterface
 {
-    protected readonly LoggerInterface $logger;
+    use CorrelationContextTrait, LoggerContextTrait;
+
     protected readonly array $config;
-    protected readonly bool $enabled;
-    protected readonly int $timeout;
-    protected readonly int $retryAttempts;
-    protected readonly int $retryDelay;
+    protected readonly Client $httpClient;
+    protected readonly string $serviceName;
 
-    public function __construct(array $config)
+    public function __construct(string $serviceName)
     {
-        $this->config = $config;
-        $this->enabled = $config['enabled'] ?? true;
-        $this->timeout = $config['timeout'] ?? 10;
-        $this->retryAttempts = $config['retry_attempts'] ?? 3;
-        $this->retryDelay = $config['retry_delay'] ?? 1;
-        
-        $this->logger = Log::channel('geofence');
-    }
+        $this->serviceName = $serviceName;
+        $this->config = Config::get('geofence.' . strtolower($serviceName));
 
-    /**
-     * Проверка доступности сервиса
-     */
-    public function isEnabled(): bool
-    {
-        return $this->enabled;
+        if (!$this->config) {
+            throw new \InvalidArgumentException("Configuration for {$serviceName} service not found.");
+        }
+
+        $this->httpClient = new Client([
+            'base_uri' => $this->config['base_uri'],
+            'timeout' => $this->config['timeout'],
+            'headers' => $this->getHeaders(),
+        ]);
     }
 
     /**
@@ -55,107 +58,97 @@ abstract class AbstractGeoService
     /**
      * Логирование запроса
      */
-    protected function logRequest(string $method, array $data, ?string $correlationId = null): void
+    protected function logRequest(string $method, array $data): void
     {
-        if (!$this->getConfigValue('logging.log_requests', true)) {
-            return;
+        if ($this->getConfigValue('logging.log_requests', true) && $this->hasLogger()) {
+            $this->logInfo("{$this->serviceName}@{$method} Request", [
+                'service' => $this->serviceName,
+                'method' => $method,
+                'data' => $data,
+                'correlation_id' => $this->getCorrelationId(),
+            ]);
         }
-
-        $this->logger->info("[{$this->getServiceName()}@{$method}] Запрос к геосервису", [
-            'correlation_id' => $correlationId ?? uniqid('geo_', true),
-            'service' => $this->getServiceName(),
-            'method' => $method,
-            'data' => $data,
-        ]);
     }
 
     /**
      * Логирование ответа
      */
-    protected function logResponse(string $method, mixed $response, ?string $correlationId = null): void
+    protected function logResponse(string $method, array $response): void
     {
-        if (!$this->getConfigValue('logging.log_responses', false)) {
-            return;
+        if ($this->getConfigValue('logging.log_responses', true) && $this->hasLogger()) {
+            $this->logInfo("{$this->serviceName}@{$method} Response", [
+                'service' => $this->serviceName,
+                'method' => $method,
+                'response' => $response,
+                'correlation_id' => $this->getCorrelationId(),
+            ]);
         }
-
-        $this->logger->info("[{$this->getServiceName()}@{$method}] Ответ от геосервиса", [
-            'correlation_id' => $correlationId ?? uniqid('geo_', true),
-            'service' => $this->getServiceName(),
-            'method' => $method,
-            'response' => $response,
-        ]);
     }
 
     /**
      * Логирование ошибки
      */
-    protected function logError(string $method, \Exception $exception, ?string $correlationId = null): void
+    protected function logError(string $method, string $message, array $context = []): void
     {
-        if (!$this->getConfigValue('logging.log_errors', true)) {
-            return;
+        if ($this->getConfigValue('logging.log_errors', true) && $this->hasLogger()) {
+            $this->log('error', "{$this->serviceName}@{$method} Error", [
+                'service' => $this->serviceName,
+                'method' => $method,
+                'message' => $message,
+                'context' => $context,
+                'correlation_id' => $this->getCorrelationId(),
+            ]);
         }
-
-        $this->logger->error("[{$this->getServiceName()}@{$method}] Ошибка геосервиса", [
-            'correlation_id' => $correlationId ?? uniqid('geo_', true),
-            'service' => $this->getServiceName(),
-            'method' => $method,
-            'error' => $exception->getMessage(),
-            'trace' => $exception->getTraceAsString(),
-        ]);
     }
 
     /**
-     * Выполнение запроса с retry логикой
+     * Выполнение запроса с повторными попытками
      */
-    protected function executeWithRetry(callable $callback, string $method, array $data = [], ?string $correlationId = null): mixed
+    protected function executeWithRetry(callable $callback, string $method, array $context = []): array
     {
-        $correlationId = $correlationId ?? uniqid('geo_', true);
-        
-        $this->logRequest($method, $data, $correlationId);
+        $maxAttempts = $this->getConfigValue('retry_attempts', 3);
+        $retryDelay = $this->getConfigValue('retry_delay', 100);
 
-        $lastException = null;
-        
-        for ($attempt = 1; $attempt <= $this->retryAttempts; $attempt++) {
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
             try {
                 $result = $callback();
-                $this->logResponse($method, $result, $correlationId);
+                $this->logResponse($method, $result);
                 return $result;
+            } catch (ConnectException $e) {
+                $this->logError($method, "Connection error (attempt {$attempt}): {$e->getMessage()}", $context);
                 
-            } catch (\Exception $exception) {
-                $lastException = $exception;
-                $this->logError($method, $exception, $correlationId);
-                
-                if ($attempt < $this->retryAttempts) {
-                    sleep($this->retryDelay);
+                if ($attempt === $maxAttempts) {
+                    throw $e;
                 }
+                
+                usleep($retryDelay * 1000 * $attempt);
+            } catch (RequestException $e) {
+                $this->logError($method, "Request error (attempt {$attempt}): {$e->getMessage()}", $context);
+                
+                if ($attempt === $maxAttempts) {
+                    throw $e;
+                }
+                
+                usleep($retryDelay * 1000 * $attempt);
+            } catch (\Exception $e) {
+                $this->logError($method, "Unexpected error (attempt {$attempt}): {$e->getMessage()}", $context);
+                throw $e;
             }
         }
 
-        throw $lastException;
+        throw new \RuntimeException("Max retry attempts exceeded for {$method}");
     }
 
     /**
-     * Получение имени сервиса
+     * Абстрактные методы для получения заголовков
      */
-    abstract protected function getServiceName(): string;
+    abstract protected function getHeaders(): array;
 
     /**
-     * Геокодирование адреса
+     * Абстрактные методы для геокодирования
      */
-    abstract public function geocode(string $address, array $options = []): array;
-
-    /**
-     * Обратное геокодирование (координаты -> адрес)
-     */
-    abstract public function reverseGeocode(float $latitude, float $longitude, array $options = []): array;
-
-    /**
-     * Поиск адресов
-     */
-    abstract public function suggest(string $query, int $count = 10, array $options = []): array;
-
-    /**
-     * Валидация адреса
-     */
-    abstract public function validate(string $address, array $options = []): array;
+    abstract public function geocode(string $address, array $options = []): BaseResult;
+    abstract public function reverseGeocode(float $latitude, float $longitude, array $options = []): BaseResult;
+    abstract public function suggest(string $query, int $count = 10, array $options = []): BaseResult;
+    abstract public function validate(string $address, array $options = []): BaseResult;
 }

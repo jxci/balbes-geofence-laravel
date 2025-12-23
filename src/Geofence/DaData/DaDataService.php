@@ -2,7 +2,7 @@
 
 namespace App\Support\Geofence\DaData;
 
-use App\Support\Geofence\AbstractGeoServiceV2;
+use App\Support\Geofence\AbstractGeoService;
 use App\Support\Geofence\DaData\Results\DaDataErrorResult;
 use App\Support\Geofence\DaData\Results\DaDataGeocodeResult;
 use App\Support\Geofence\DaData\Results\DaDataSuggestResult;
@@ -17,7 +17,7 @@ use GuzzleHttp\Exception\GuzzleException;
 /**
  * DaData API сервис
  */
-class DaDataService extends AbstractGeoServiceV2
+class DaDataService extends AbstractGeoService
 {
     public function __construct()
     {
@@ -84,7 +84,15 @@ class DaDataService extends AbstractGeoServiceV2
     }
 
     /**
-     * Обратное геокодирование
+     * Обратное геокодирование (поиск адресов по координатам)
+     * 
+     * @param float $latitude Географическая широта
+     * @param float $longitude Географическая долгота
+     * @param array $options Опции запроса:
+     *   - count (int): Количество результатов (максимум 20, по умолчанию 10)
+     *   - radius_meters (int): Радиус поиска в метрах (максимум 1000, по умолчанию 100)
+     *   - language (string): Язык результата (ru/en, по умолчанию ru)
+     *   - division (string): Административное либо муниципальное деление (по умолчанию ADMINISTRATIVE)
      */
     public function reverseGeocode(float $latitude, float $longitude, array $options = []): DaDataSuggestResult|DaDataErrorResult
     {
@@ -92,8 +100,23 @@ class DaDataService extends AbstractGeoServiceV2
             $requestData = [
                 'lat' => $latitude,
                 'lon' => $longitude,
-                'count' => $options['count'] ?? 1,
+                'count' => $options['count'] ?? 10,
             ];
+            
+            # Радиус поиска в метрах (максимум 1000)
+            if (isset($options['radius_meters'])) {
+                $requestData['radius_meters'] = min((int) $options['radius_meters'], 1000);
+            }
+            
+            # Язык результата (ru/en)
+            if (isset($options['language'])) {
+                $requestData['language'] = $options['language'];
+            }
+            
+            # Административное либо муниципальное деление
+            if (isset($options['division'])) {
+                $requestData['division'] = $options['division'];
+            }
             
             $this->logRequest('reverseGeocode', $requestData);
             
