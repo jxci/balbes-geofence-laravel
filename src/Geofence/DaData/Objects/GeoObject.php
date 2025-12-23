@@ -2,6 +2,8 @@
 
 namespace App\Support\Geofence\DaData\Objects;
 
+use App\Support\Geofence\DaData\Enums\FiasLevel;
+use App\Support\Geofence\DaData\Enums\GeoAccuracyCode;
 use App\Support\Geofence\DaData\Objects\Concerns\HasDataAccess;
 
 /**
@@ -148,11 +150,27 @@ class GeoObject
     }
 
     /**
+     * Получить код точности координат как ENUM
+     */
+    public function getQcGeoEnum(): ?GeoAccuracyCode
+    {
+        return GeoAccuracyCode::fromInt($this->getQcGeo());
+    }
+
+    /**
      * Получить уровень детализации (fias_level)
      */
     public function getFiasLevel(): ?string
     {
         return $this->data['fias_level'] ?? null;
+    }
+
+    /**
+     * Получить уровень детализации ФИАС как ENUM
+     */
+    public function getFiasLevelEnum(): ?FiasLevel
+    {
+        return FiasLevel::fromString($this->getFiasLevel());
     }
 
     /**

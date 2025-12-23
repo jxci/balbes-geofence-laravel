@@ -85,4 +85,76 @@ abstract class SuccessResult extends BaseResult
     {
         return $this->toArray();
     }
+
+    /**
+     * Получить координаты из первого результата
+     * 
+     * Нормализует координаты из разных форматов (geo_lat/geo_lon, latitude/longitude)
+     * 
+     * @return array{latitude: float, longitude: float}|null Массив с координатами или null
+     */
+    public function getFirstResultCoordinates(): ?array
+    {
+        $firstResult = $this->getFirstResult();
+        if (!$firstResult || !is_array($firstResult)) {
+            return null;
+        }
+
+        $latitude = $firstResult['latitude'] ?? $firstResult['geo_lat'] ?? null;
+        $longitude = $firstResult['longitude'] ?? $firstResult['geo_lon'] ?? null;
+
+        if ($latitude === null || $longitude === null) {
+            return null;
+        }
+
+        return [
+            'latitude' => (float) $latitude,
+            'longitude' => (float) $longitude,
+        ];
+    }
+
+    /**
+     * Проверить, есть ли координаты в первом результате
+     */
+    public function hasFirstResultCoordinates(): bool
+    {
+        return $this->getFirstResultCoordinates() !== null;
+    }
+
+    /**
+     * Получить координаты из всех результатов
+     * 
+     * @return array<int, array{latitude: float, longitude: float}> Массив координат
+     */
+    public function getAllCoordinates(): array
+    {
+        $coordinates = [];
+        $results = $this->toArray();
+
+        foreach ($results as $result) {
+            if (!is_array($result)) {
+                continue;
+            }
+
+            $latitude = $result['latitude'] ?? $result['geo_lat'] ?? null;
+            $longitude = $result['longitude'] ?? $result['geo_lon'] ?? null;
+
+            if ($latitude !== null && $longitude !== null) {
+                $coordinates[] = [
+                    'latitude' => (float) $latitude,
+                    'longitude' => (float) $longitude,
+                ];
+            }
+        }
+
+        return $coordinates;
+    }
+
+    /**
+     * Проверить, есть ли хотя бы один результат с координатами
+     */
+    public function hasAnyCoordinates(): bool
+    {
+        return !empty($this->getAllCoordinates());
+    }
 }

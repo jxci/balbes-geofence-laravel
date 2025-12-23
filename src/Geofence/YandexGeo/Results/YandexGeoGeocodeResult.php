@@ -130,6 +130,51 @@ class YandexGeoGeocodeResult extends SuccessResult
     }
 
     /**
+     * Получить координаты из первого геообъекта
+     * 
+     * @return array{latitude: float, longitude: float}|null Массив с координатами или null
+     */
+    public function getFirstGeoCoordinates(): ?array
+    {
+        $firstGeo = $this->getFirstGeo();
+        if (!$firstGeo || !$firstGeo->hasCoordinates()) {
+            return null;
+        }
+
+        $coordinates = $firstGeo->getCoordinates();
+        if (!$coordinates) {
+            return null;
+        }
+
+        return [
+            'latitude' => (float) $coordinates['lat'],
+            'longitude' => (float) $coordinates['lng'],
+        ];
+    }
+
+    /**
+     * Получить координаты из всех геообъектов
+     * 
+     * @return array<int, array{latitude: float, longitude: float}> Массив координат
+     */
+    public function getAllGeosCoordinates(): array
+    {
+        $coordinates = [];
+        foreach ($this->getResults() as $geo) {
+            if ($geo->hasCoordinates()) {
+                $coords = $geo->getCoordinates();
+                if ($coords) {
+                    $coordinates[] = [
+                        'latitude' => (float) $coords['lat'],
+                        'longitude' => (float) $coords['lng'],
+                    ];
+                }
+            }
+        }
+        return $coordinates;
+    }
+
+    /**
      * Получить все результаты в виде массива массивов
      * 
      * @return array<int, array> Массив результатов, где каждый элемент - массив с данными адреса
